@@ -1,9 +1,14 @@
 package com.harisw.customer;
 
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 @Service
-public record CustomerService(CustomerRepository customerRepository) {
+@AllArgsConstructor
+public class CustomerService {
+    private final CustomerRepository customerRepository;
+    private final RestTemplate restTemplate;
     //Builder pattern
     public void registerCustomer(CustomerRegistrationRequest request) {
         Customer customer = Customer.builder()
@@ -12,6 +17,15 @@ public record CustomerService(CustomerRepository customerRepository) {
                 .email(request.email())
                 .build();
         //To check : email validation, email duplicate
-        customerRepository.save(customer);
+        customerRepository.saveAndFlush(customer);
+        FraudCheckResponse fraudCheckResponse = restTemplate.getForObject(
+                "http://localhost:8081/api/v1/fraud-check/{customerId}",
+                FraudCheckResponse.class,
+                customer.getId()
+        );
+        if(fraudCheckResponse.isFraudster()){
+            throw new IllegalStateException("Fraudster");
+        }
+        // Todo: send notification
     }
 }
